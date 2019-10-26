@@ -1,6 +1,11 @@
 {
-  "name": "Vector Split",
+  "name": "Split Vectors",
   "id": "769868828362075393",
   "api": "1.0.0",
-  "main": "code.js"
+  "main": "code.js",
+  "menu": [
+	{ "name": "Fills", "command": "f" },
+	{ "name": "Shapes", "command": "s" },
+	{ "name": "Segments", "command": "l" }
+  ]
 }
