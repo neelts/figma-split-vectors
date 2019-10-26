@@ -1,5 +1,13 @@
 const selection = figma.currentPage.selection;
 
+function errorOne(object: BaseNodeMixin) {
+	note = `Can't split! ${object.name} has only one fill segment`;
+}
+
+function errorSelect() {
+	note = "Select Vector node(s)";
+}
+
 let note = null;
 let processed = 0;
 
@@ -8,6 +16,7 @@ const select = [];
 if (selection.length > 0) {
 
 	selection.forEach((object) => {
+
 		switch (object.type) {
 
 			case "VECTOR": {
@@ -77,7 +86,7 @@ if (selection.length > 0) {
 						v.strokeWeight = vector.strokeWeight;
 						v.opacity = vector.opacity;
 						v.effects = vector.effects;
-						v.constraints = {horizontal: "SCALE", vertical: "SCALE"};
+						v.constraints = { horizontal: "SCALE", vertical: "SCALE" };
 
 						vectors.push(v);
 
@@ -104,7 +113,7 @@ if (selection.length > 0) {
 
 				} else {
 
-					note = `Can't split! ${object.name} have only one fill segment`;
+					errorOne(object);
 				}
 
 				break;
@@ -115,17 +124,17 @@ if (selection.length > 0) {
 			case "POLYGON":
 			case "RECTANGLE":
 			case "STAR": {
-				note = `Can't split! ${object.name} nodes have only one fill segment`;
+				errorOne(object);
 				break;
 			}
 
 			default:
-				note = "Select Vector node(s)";
+				errorSelect();
 				break;
 		}
 	});
 } else {
-	note = "Select Vector node(s)";
+	errorSelect();
 }
 
 if (note && !processed) figma.notify(note);
