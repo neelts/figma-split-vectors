@@ -71,84 +71,80 @@ function process(processor) {
 
 function fills(vector) {
 
-	const vn = vector.vectorNetwork;
+	const vectorNetwork = vector.vectorNetwork;
 
-	console.log(vn);
-	console.log(vector.vectorPaths);
-
-	if (vn.regions.length > 1) {
+	if (vectorNetwork.regions.length > 1) {
 
 		const vectors = [];
 
-		vn.regions.forEach(region => {
+		vectorNetwork.regions.forEach(region => {
 
-			const v = figma.createVector();
+			const newVector = figma.createVector();
 
-			const vs = [];
-			const ls = [];
-			const ss = [];
+			const vertices = [];
+			const regions = [];
+			const segments = [];
 
-			const sm = new Map<Number, Number>();
-			const vm = new Map<Number, Number>();
+			const segmentsMap = new Map<number, number>();
+			const vertexesMap = new Map<number, number>();
 
 			region.loops.forEach(
 				loop => {
-					const l = [];
-					console.log(loop);
+					const loops = [];
 					loop.forEach(si => {
-						if (!sm.has(si)) {
-							const s = vn.segments[si];
-							if (!vm.has(s.start)) {
-								vs.push(vn.vertices[s.start]);
-								vm.set(s.start, vs.length - 1);
+						if (!segmentsMap.has(si)) {
+							const s = vectorNetwork.segments[si];
+							if (!vertexesMap.has(s.start)) {
+								vertices.push(vectorNetwork.vertices[s.start]);
+								vertexesMap.set(s.start, vertices.length - 1);
 							}
-							if (!vm.has(s.end)) {
-								vs.push(vn.vertices[s.end]);
-								vm.set(s.end, vs.length - 1);
+							if (!vertexesMap.has(s.end)) {
+								vertices.push(vectorNetwork.vertices[s.end]);
+								vertexesMap.set(s.end, vertices.length - 1);
 							}
-							if (!sm.has(si)) {
-								ss.push({
-									start: vm.get(s.start),
-									end: vm.get(s.end),
+							if (!segmentsMap.has(si)) {
+								segments.push({
+									start: vertexesMap.get(s.start),
+									end: vertexesMap.get(s.end),
 									tangentStart: s.tangentStart,
 									tangentEnd: s.tangentEnd
 								});
-								sm.set(si, ss.length - 1);
+								segmentsMap.set(si, segments.length - 1);
 							}
 						}
-						l.push(sm.get(si));
+						loops.push(segmentsMap.get(si));
 					});
-					ls.push(l);
+					regions.push(loops);
 				}
 			);
 
-			v.vectorNetwork = {
-				vertices: vs,
+			newVector.vectorNetwork = {
+				vertices: vertices,
 				regions: [{
-					windingRule: vn.regions[0].windingRule, loops: ls
+					windingRule: vectorNetwork.regions[0].windingRule, loops: regions
 				}],
-				segments: ss
+				segments: segments
 			};
 
-			copyVectorProps(v, vector);
+			copyVectorProps(newVector, vector);
 
-			vectors.push(v);
+			vectors.push(newVector);
 
 		});
 
 		const hasStrokes = vector.strokes.length > 0;
 
-		let vc = null;
+		let original = null;
 		if (hasStrokes) {
-			vc = figma.createVector();
-			vc.vectorNetwork = vector.vectorNetwork;
-			copyVectorProps(vc, vector);
-			vc.fills = [];
-			vectors.push(vc);
+			original = figma.createVector();
+			original.vectorNetwork = vector.vectorNetwork;
+			copyVectorProps(original, vector);
+			original.fills = [];
+			vectors.push(original);
 		}
 
 		const group = groupVectors(vector, vectors);
-		if (hasStrokes) group.insertChild(0, vc);
+		if (hasStrokes) group.insertChild(0, original);
 
 		processed++;
 
@@ -160,30 +156,146 @@ function fills(vector) {
 
 function shapes(vector) {
 
-	const vn = vector.vectorNetwork;
+	const vectorNetwork = vector.vectorNetwork;
 
-	vn.segments.forEach(segment => {
+	interface Vertex {
+		vertex: VectorNode;
+		links: Set<Vertex>;
+		index: number;
+		newIndex: number;
+	}
 
+	let vertexIndex = 0;
 
+	const getVector = (index) => ({
+		links: new Set<Vertex>(), vertex: vectorNetwork.vertices[index],
+		index: vertexIndex++, newIndex: 0
+	});
+
+	const vertexesMap = new Map<number, Vertex>();
+
+	vectorNetwork.segments.forEach(segment => {
+
+		if (!vertexesMap.has(segment.start)) {
+			vertexesMap.set(segment.start, getVector(segment.start));
+		}
+
+		if (!vertexesMap.has(segment.end)) {
+			vertexesMap.set(segment.end, getVector(segment.end));
+		}
+
+		const start = vertexesMap.get(segment.start);
+		const end = vertexesMap.get(segment.end);
+
+		if (!start.links.has(end)) start.links.add(end);
+		if (!end.links.has(start)) end.links.add(start);
 
 	});
+
+	const vertexesToVisit = new Set<Vertex>();
+	for (const vertex of vertexesMap.values()) vertexesToVisit.add(vertex);
+
+	interface Shape {
+		vertices: Vertex[];
+		segments: VectorSegment[];
+		regions: VectorRegion[];
+	}
+
+	const getShape = () => {
+		return { vertices:[], segments:[], regions:[] }
+	};
+
+	const shapes : Shape[] = [];
+
+	function visit(vertex, vertices, index) {
+		vertex.newIndex = index;
+		vertex.index = vertices.length;
+		vertices.push(vertex);
+		vertexesToVisit.delete(vertex);
+		vertex.links.forEach(vertex => {
+			if (vertexesToVisit.has(vertex)) visit(vertex, vertices, index);
+		});
+	}
+
+	while (true) {
+		const vertex = vertexesToVisit.values().next().value;
+		if (vertex) {
+			const shape = getShape();
+			visit(vertex, shape.vertices, shapes.length);
+			shape.vertices.sort((a, b) => a.index - b.index);
+			shapes.push(shape);
+		} else break;
+	}
+
+	if (shapes.length > 1) {
+
+		const vectors = [];
+		const shapesMap = new Map<number, number>();
+
+		vectorNetwork.segments.forEach((segment, index) => {
+			const vertex = vertexesMap.get(segment.start);
+			const shape = shapes[vertex.newIndex];
+			shapesMap.set(index, shape.segments.length);
+			shape.segments.push({
+				start: vertex.index, end: vertexesMap.get(segment.end).index,
+				tangentStart: segment.tangentStart, tangentEnd: segment.tangentEnd
+			});
+		});
+
+		vectorNetwork.regions.forEach(region => {
+			const vertex = vertexesMap.get(region.loops[0][0]);
+			const shape = shapes[vertex.newIndex];
+			shape.regions.push({
+				windingRule: region.windingRule,
+				loops: region.loops.map(
+					loops => loops.map(
+						segmentIndex => shapesMap.get(segmentIndex)
+					)
+				)
+			});
+		});
+
+		shapes.forEach(shape => {
+
+			const newVector = figma.createVector();
+
+			const vertices = [];
+			shape.vertices.forEach(vertex => vertices.push(vertex.vertex));
+
+			newVector.vectorNetwork = {
+				vertices: vertices,
+				regions: shape.regions,
+				segments: shape.segments
+			};
+
+			copyVectorProps(newVector, vector);
+			vectors.push(newVector);
+		});
+
+		groupVectors(vector, vectors);
+		processed++;
+
+	} else {
+
+		errorOne(vector, "shape");
+	}
 
 }
 
 function segments(vector) {
 
-	const vn = vector.vectorNetwork;
+	const vectorNetwork = vector.vectorNetwork;
 
-	if (vn.segments.length > 1) {
+	if (vectorNetwork.segments.length > 1) {
 
 		const vectors = [];
 
-		vn.segments.forEach(segment => {
+		vectorNetwork.segments.forEach(segment => {
 
-			const v = figma.createVector();
+			const newVector = figma.createVector();
 
-			v.vectorNetwork = {
-				vertices: [vn.vertices[segment.start], vn.vertices[segment.end]],
+			newVector.vectorNetwork = {
+				vertices: [vectorNetwork.vertices[segment.start], vectorNetwork.vertices[segment.end]],
 				segments: [{
 					start:0, end:1,
 					tangentStart:segment.tangentStart,
@@ -192,26 +304,26 @@ function segments(vector) {
 				regions: []
 			};
 
-			copyVectorProps(v, vector);
+			copyVectorProps(newVector, vector);
 
-			vectors.push(v);
+			vectors.push(newVector);
 
 		});
 
 		const hasFills = vector.fills.length > 0;
 
-		let vc = null;
+		let original = null;
 
 		if (hasFills) {
-			vc = figma.createVector();
-			vc.vectorNetwork = vector.vectorNetwork;
-			copyVectorProps(vc, vector);
-			vc.strokes = [];
-			vectors.push(vc);
+			original = figma.createVector();
+			original.vectorNetwork = vector.vectorNetwork;
+			copyVectorProps(original, vector);
+			original.strokes = [];
+			vectors.push(original);
 		}
 
 		const group = groupVectors(vector, vectors);
-		if (hasFills) group.insertChild(0, vc);
+		if (hasFills) group.insertChild(0, original);
 
 		processed++;
 
