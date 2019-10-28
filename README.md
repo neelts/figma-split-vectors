@@ -27,3 +27,7 @@ Subscribe to updates, discuss and report bugs in Telegram:
 https://t.me/nfigma
 
 Dedicated to my beloved wife Sofia 💖
+
+#### Icon & Artwork:
+
+https://www.figma.com/file/PPhI199En4E0awqyUGRKD5/Figma-Plugins-by-Neelts?node-id=38%3A1779
