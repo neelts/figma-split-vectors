@@ -1,4 +1,4 @@
-# Figma Split Vectors plugin
+# Figma Split Vectors Plugin
 
 Tired of copying vector parts to customize them?
 Try this plugin to speedup your work!
