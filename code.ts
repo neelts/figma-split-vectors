@@ -202,10 +202,10 @@ function shapes(vector) {
 	}
 
 	const getShape = () => {
-		return { vertices:[], segments:[], regions:[] }
+		return {vertices: [], segments: [], regions: []}
 	};
 
-	const shapes : Shape[] = [];
+	const shapes: Shape[] = [];
 
 	function visit(vertex, vertices, index) {
 		vertex.newIndex = index;
@@ -218,7 +218,7 @@ function shapes(vector) {
 	}
 
 	while (true) {
-		const vertex = vertexesToVisit.values().next().value;
+		const vertex: Vertex = vertexesToVisit.values().next().value;
 		if (vertex) {
 			const shape = getShape();
 			visit(vertex, shape.vertices, shapes.length);
@@ -230,12 +230,12 @@ function shapes(vector) {
 	if (shapes.length > 1) {
 
 		const vectors = [];
-		const shapesMap = new Map<number, number>();
+		const segmentsMap = new Map<number, number>();
 
 		vectorNetwork.segments.forEach((segment, index) => {
 			const vertex = vertexesMap.get(segment.start);
 			const shape = shapes[vertex.newIndex];
-			shapesMap.set(index, shape.segments.length);
+			segmentsMap.set(index, shape.segments.length);
 			shape.segments.push({
 				start: vertex.index, end: vertexesMap.get(segment.end).index,
 				tangentStart: segment.tangentStart, tangentEnd: segment.tangentEnd
@@ -243,13 +243,13 @@ function shapes(vector) {
 		});
 
 		vectorNetwork.regions.forEach(region => {
-			const vertex = vertexesMap.get(region.loops[0][0]);
+			const vertex = vertexesMap.get(vectorNetwork.segments[region.loops[0][0]].start);
 			const shape = shapes[vertex.newIndex];
 			shape.regions.push({
 				windingRule: region.windingRule,
 				loops: region.loops.map(
 					loops => loops.map(
-						segmentIndex => shapesMap.get(segmentIndex)
+						segmentIndex => segmentsMap.get(segmentIndex)
 					)
 				)
 			});
@@ -297,9 +297,9 @@ function segments(vector) {
 			newVector.vectorNetwork = {
 				vertices: [vectorNetwork.vertices[segment.start], vectorNetwork.vertices[segment.end]],
 				segments: [{
-					start:0, end:1,
-					tangentStart:segment.tangentStart,
-					tangentEnd:segment.tangentEnd
+					start: 0, end: 1,
+					tangentStart: segment.tangentStart,
+					tangentEnd: segment.tangentEnd
 				}],
 				regions: []
 			};
