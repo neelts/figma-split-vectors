@@ -3,6 +3,7 @@
   "id": "769868828362075393",
   "api": "1.0.0",
   "main": "code.js",
+  "editorType": ["figma", "figjam"],
   "menu": [
 	{ "name": "Fills", "command": "f" },
 	{ "name": "Shapes", "command": "s" },

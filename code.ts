@@ -9,7 +9,8 @@ function errorSelect() {
 }
 
 function copyVectorProps(to: VectorNode, from: VectorNode) {
-	to.fills = from.fills;
+	if (typeof from.fills !== "symbol")
+		to.fills = from.fills;
 	to.strokes = from.strokes;
 	to.strokeAlign = from.strokeAlign;
 	to.strokeCap = from.strokeCap;
@@ -69,7 +70,7 @@ function process(processor) {
 	});
 }
 
-function fills(vector) {
+function fills(vector: VectorNode) {
 
 	const vectorNetwork = vector.vectorNetwork;
 
@@ -84,12 +85,15 @@ function fills(vector) {
 			const vertices = [];
 			const regions = [];
 			const segments = [];
+			const fills = [];
 
 			const segmentsMap = new Map<number, number>();
 			const vertexesMap = new Map<number, number>();
 
+			const fillStyleId = region.fillStyleId?.length ? region.fillStyleId : null;
+			
 			region.loops.forEach(
-				loop => {
+				(loop, index) => {
 					const loops = [];
 					loop.forEach(si => {
 						if (!segmentsMap.has(si)) {
@@ -115,16 +119,21 @@ function fills(vector) {
 						loops.push(segmentsMap.get(si));
 					});
 					regions.push(loops);
+					if (!fillStyleId && region.fills?.length)
+						fills.push(region.fills[index]);
 				}
 			);
 
 			newVector.vectorNetwork = {
-				vertices: vertices,
-				regions: [{
-					windingRule: vectorNetwork.regions[0].windingRule, loops: regions
-				}],
-				segments: segments
+				vertices, segments,
+				regions: [{ windingRule: region.windingRule, loops: regions }],
 			};
+			
+			if (fillStyleId) {
+				newVector.fillStyleId = fillStyleId;
+			} else if (fills.length) {
+				newVector.fills = fills;
+			}
 
 			copyVectorProps(newVector, vector);
 
@@ -154,12 +163,12 @@ function fills(vector) {
 	}
 }
 
-function shapes(vector) {
+function shapes(vector: VectorNode) {
 
 	const vectorNetwork = vector.vectorNetwork;
 
 	interface Vertex {
-		vertex: VectorNode;
+		vertex: VectorVertex;
 		links: Set<Vertex>;
 		index: number;
 		newIndex: number;
@@ -167,7 +176,7 @@ function shapes(vector) {
 
 	let vertexIndex = 0;
 
-	const getVector = (index) => ({
+	const getVector = (index): Vertex => ({
 		links: new Set<Vertex>(), vertex: vectorNetwork.vertices[index],
 		index: vertexIndex++, newIndex: 0
 	});
@@ -282,7 +291,7 @@ function shapes(vector) {
 
 }
 
-function segments(vector) {
+function segments(vector: VectorNode) {
 
 	const vectorNetwork = vector.vectorNetwork;
 
@@ -310,7 +319,7 @@ function segments(vector) {
 
 		});
 
-		const hasFills = vector.fills.length > 0;
+		const hasFills = (<ReadonlyArray<Paint>>vector.fills).length > 0;
 
 		let original = null;
 
