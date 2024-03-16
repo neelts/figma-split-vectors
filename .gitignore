@@ -1,3 +1,4 @@
 .idea
 *.js
 assets/
+node_modules/

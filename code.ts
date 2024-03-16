@@ -1,24 +1,11 @@
 const selection = figma.currentPage.selection;
 
-function errorOne(object: BaseNodeMixin, kind: String) {
+function errorOne(object: BaseNodeMixin, kind: string) {
 	note = `Can't split! ${object.name} has only one ${kind}`;
 }
 
 function errorSelect() {
 	note = "Select Vector node(s)";
-}
-
-function copyVectorProps(to: VectorNode, from: VectorNode) {
-	if (typeof from.fills !== "symbol")
-		to.fills = from.fills;
-	to.strokes = from.strokes;
-	to.strokeAlign = from.strokeAlign;
-	to.strokeCap = from.strokeCap;
-	to.strokeJoin = from.strokeJoin;
-	to.strokeWeight = from.strokeWeight;
-	to.opacity = from.opacity;
-	to.effects = from.effects;
-	to.constraints = {horizontal: "SCALE", vertical: "SCALE"};
 }
 
 let note = null;
@@ -48,7 +35,7 @@ if (selection.length > 0) {
 	errorSelect();
 }
 
-function process(processor) {
+function process(processor: (object: VectorNode) => void){
 	selection.forEach(object => {
 		switch (object.type) {
 			case "VECTOR": {
@@ -78,9 +65,9 @@ function fills(vector: VectorNode) {
 
 		const vectors = [];
 
-		vectorNetwork.regions.forEach(region => {
+		vectorNetwork.regions.forEach(async region => {
 
-			const newVector = figma.createVector();
+			const newVector = vector.clone();
 
 			const vertices = [];
 			const regions = [];
@@ -124,18 +111,16 @@ function fills(vector: VectorNode) {
 				}
 			);
 
-			newVector.vectorNetwork = {
+			await newVector.setVectorNetworkAsync({
 				vertices, segments,
 				regions: [{ windingRule: region.windingRule, loops: regions }],
-			};
+			});
 			
 			if (fillStyleId) {
-				newVector.fillStyleId = fillStyleId;
+				await newVector.setFillStyleIdAsync(fillStyleId);
 			} else if (fills.length) {
 				newVector.fills = fills;
 			}
-
-			copyVectorProps(newVector, vector);
 
 			vectors.push(newVector);
 
@@ -145,9 +130,7 @@ function fills(vector: VectorNode) {
 
 		let original = null;
 		if (hasStrokes) {
-			original = figma.createVector();
-			original.vectorNetwork = vector.vectorNetwork;
-			copyVectorProps(original, vector);
+			original = vector.clone();
 			original.fills = [];
 			vectors.push(original);
 		}
@@ -176,7 +159,7 @@ function shapes(vector: VectorNode) {
 
 	let vertexIndex = 0;
 
-	const getVector = (index): Vertex => ({
+	const getVector = (index: number) => ({
 		links: new Set<Vertex>(), vertex: vectorNetwork.vertices[index],
 		index: vertexIndex++, newIndex: 0
 	});
@@ -216,7 +199,7 @@ function shapes(vector: VectorNode) {
 
 	const shapes: Shape[] = [];
 
-	function visit(vertex, vertices, index) {
+	function visit(vertex: Vertex, vertices: Vertex[], index: number) {
 		vertex.newIndex = index;
 		vertex.index = vertices.length;
 		vertices.push(vertex);
@@ -226,15 +209,15 @@ function shapes(vector: VectorNode) {
 		});
 	}
 
-	while (true) {
-		const vertex: Vertex = vertexesToVisit.values().next().value;
-		if (vertex) {
+	const vertex: Vertex = null;
+	do {
+		if (vertex == vertexesToVisit.values().next().value) {
 			const shape = getShape();
 			visit(vertex, shape.vertices, shapes.length);
 			shape.vertices.sort((a, b) => a.index - b.index);
 			shapes.push(shape);
 		} else break;
-	}
+	} while (vertex);
 
 	if (shapes.length > 1) {
 
@@ -264,20 +247,18 @@ function shapes(vector: VectorNode) {
 			});
 		});
 
-		shapes.forEach(shape => {
+		shapes.forEach(async shape => {
 
-			const newVector = figma.createVector();
+			const newVector = vector.clone();
 
 			const vertices = [];
 			shape.vertices.forEach(vertex => vertices.push(vertex.vertex));
 
-			newVector.vectorNetwork = {
+			await newVector.setVectorNetworkAsync({
 				vertices: vertices,
 				regions: shape.regions,
 				segments: shape.segments
-			};
-
-			copyVectorProps(newVector, vector);
+			});
 			vectors.push(newVector);
 		});
 
@@ -299,11 +280,11 @@ function segments(vector: VectorNode) {
 
 		const vectors = [];
 
-		vectorNetwork.segments.forEach(segment => {
+		vectorNetwork.segments.forEach(async segment => {
 
-			const newVector = figma.createVector();
+			const newVector = vector.clone();
 
-			newVector.vectorNetwork = {
+			await newVector.setVectorNetworkAsync({
 				vertices: [vectorNetwork.vertices[segment.start], vectorNetwork.vertices[segment.end]],
 				segments: [{
 					start: 0, end: 1,
@@ -311,9 +292,7 @@ function segments(vector: VectorNode) {
 					tangentEnd: segment.tangentEnd
 				}],
 				regions: []
-			};
-
-			copyVectorProps(newVector, vector);
+			});
 
 			vectors.push(newVector);
 
@@ -324,9 +303,7 @@ function segments(vector: VectorNode) {
 		let original = null;
 
 		if (hasFills) {
-			original = figma.createVector();
-			original.vectorNetwork = vector.vectorNetwork;
-			copyVectorProps(original, vector);
+			original = vector.clone();
 			original.strokes = [];
 			vectors.push(original);
 		}
@@ -343,13 +320,13 @@ function segments(vector: VectorNode) {
 
 }
 
-function groupVectors(vector, vectors) {
+function groupVectors(vector: VectorNode, vectors: VectorNode[]) {
 
 	const group = figma.group(
 		vectors, vector.parent,
 		vector.parent.children.indexOf(vector)
 	);
-
+	
 	group.x = vector.x;
 	group.y = vector.y;
 	group.rotation = vector.rotation;

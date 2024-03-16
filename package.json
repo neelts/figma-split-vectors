@@ -1,0 +1,26 @@
+{
+  "name": "figma-split-vectors",
+  "version": "1.0.0",
+  "description": "",
+  "main": "code.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "compilerOptions": {
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@figma"
+    ]
+  },
+  "devDependencies": {
+    "@figma/eslint-plugin-figma-plugins": "^0.15.0",
+    "@figma/plugin-typings": "^1.88.0",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.2"
+  }
+}
